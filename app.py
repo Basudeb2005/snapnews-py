@@ -265,3 +265,73 @@ def run():
     load_saved_articles()
 
 run()
+
+def display_news(list_of_news, page_number, language):
+    translator = Translator()
+    items_per_page = 5
+    start_index = page_number * items_per_page
+    end_index = start_index + items_per_page
+    news_to_display = list_of_news[start_index:end_index]
+
+    for i, news in enumerate(news_to_display):
+        index = start_index + i
+        st.write(f'**({index + 1}) {news.title.text}**')
+
+        if not news.link or not news.link.text.startswith('http'):
+            st.warning(f"Skipping article with invalid URL: {news.link.text}")
+            continue
+        
+        try:
+            article = Article(news.link.text)
+            article.download()
+            article.parse()
+
+            # Perform NLP and summarize the article
+            article.nlp()
+            summary = article.summary if article.summary else "No summary available."
+            
+            # Translate summary to the selected language
+            summary_translated = translator.translate(summary, dest=language).text
+            
+            # Display news poster image
+            image_url = article.top_image if article.top_image else 'snap.png'
+            fetch_news_poster(image_url)
+            
+            # Display summary and link to full article
+            with st.expander(news.title.text):
+                st.markdown(f"<h6 style='text-align: justify;'>{summary_translated}</h6>", unsafe_allow_html=True)
+                st.markdown(f"[Read more at source]({article.source_url})", unsafe_allow_html=True)
+                
+                # Text to speech functionality
+                audio_html = text_to_speech(summary_translated)
+                st.markdown(audio_html, unsafe_allow_html=True)
+
+                # Save/Unsave buttons
+                if st.session_state['saved_status'].get(index, False):
+                    if st.button("Unsave", key=f"unsave_{index}"):
+                        unsave_article(index, news.title.text)
+                else:
+                    if st.button("Save", key=f"save_{index}"):
+                        save_article(index, news.title.text, news.link.text, summary_translated)
+
+                st.write("---")
+                st.write("Share on:")
+                # Share buttons
+                st.markdown(
+                    f"""
+                    <a href="https://www.facebook.com/sharer/sharer.php?u={news.link.text}" target="_blank">
+                    <img src="https://img.icons8.com/fluent/48/000000/facebook-new.png"/>
+                    </a>
+                    <a href="https://twitter.com/intent/tweet?url={news.link.text}&text={news.title.text}" target="_blank">
+                    <img src="https://img.icons8.com/fluent/48/000000/twitter.png"/>
+                    </a>
+                    <a href="https://www.linkedin.com/shareArticle?mini=true&url={news.link.text}&title={news.title.text}" target="_blank">
+                    <img src="https://img.icons8.com/fluent/48/000000/linkedin.png"/>
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.success("Published Date: " + news.pubDate.text)
+
+        except Exception as e:
+            st.error(f"Error processing article {news.link.text}: {e}")
