@@ -160,7 +160,9 @@ def summarize_text(text):
     for sentence in sentences:
         if sentence in sentence_value and sentence_value[sentence] > (1.5 * average):
             summary += " " + sentence
-    return summarydef display_news(list_of_news, page_number, language, s):
+    return summary
+def display_news(list_of_news, page_number, language, s):
+    from googletrans import Translator
     translator = Translator()
     items_per_page = 5
     start_index = page_number * items_per_page
@@ -245,7 +247,6 @@ def summarize_text(text):
             if st.button("Next", key="next"):
                 st.session_state['page_number'] += 1
                 st.rerun()
-
 def display_search_news(list_of_news, page_number):
     items_per_page = 5
     start_index = page_number * items_per_page
