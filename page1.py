@@ -11,23 +11,14 @@ import requests
 import re
 import os
 import pandas as pd
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.lsa import LsaSummarizer
+import hashlib
 import csv
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize, sent_tokenize
 
-# Download necessary NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt', quiet=True)
 
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
 
-# Streamlit session state initialization
 if 'saved_articles' not in st.session_state:
     st.session_state['saved_articles'] = []
 
@@ -37,14 +28,9 @@ if 'saved_status' not in st.session_state:
 if 'page_number' not in st.session_state:
     st.session_state['page_number'] = 0
 
-if 'search_page_number' not in st.session_state:
-    st.session_state['search_page_number'] = 0
-
-
 NEWS_API_KEY = 'ec48b2493593467a8947d0253d2786a2'
 COMMENTS_CSV = 'comments.csv'
 USERS_CSV = 'users.csv'
-
 
 def fetch_rss_feed(url):
     try:
@@ -69,18 +55,15 @@ def fetch_news_poster(poster_link):
         image = Image.open('snap.png')
         st.image(image, use_column_width=True)
 
-
 def save_article(index, title, link, summary):
     st.session_state['saved_articles'].append({'title': title, 'link': link, 'summary': summary})
     st.session_state['saved_status'][index] = True
     st.success(f'Article "{title}" saved!')
 
-
 def unsave_article(index, title):
     st.session_state['saved_articles'] = [article for article in st.session_state['saved_articles'] if article['title'] != title]
     st.session_state['saved_status'][index] = False
     st.success(f'Article "{title}" removed!')
-
 
 def load_saved_articles():
     st.subheader("Saved Articles")
@@ -106,16 +89,20 @@ def text_to_speech(text, lang='en'):
     """
     return audio_html
 
+def summarize_text(text):
+    parser = PlaintextParser.from_string(text, Tokenizer("english"))
+    summarizer = LsaSummarizer()
+    summary = summarizer(parser.document, 2)  # Summarize to 2 sentences
+    return " ".join([str(sentence) for sentence in summary])
+
 def extract_article_text(url):
     try:
         article = Article(url)
         article.download()
         article.parse()
-        if not article.text:  # Check if article text is None or empty
-            raise ValueError("Article text is empty")
         return article.text, article.top_image
     except Exception as e:
-        st.warning(f"Newspaper library failed to extract article: {e}")
+        st.error(f"Newspaper library failed to extract article: {e}")
         try:
             headers = {'User-Agent': 'Mozilla/5.0'}
             req = Request(url, headers=headers)
@@ -125,51 +112,10 @@ def extract_article_text(url):
             text = ' '.join([para.text for para in paragraphs])
             top_image = page_soup.find('meta', property='og:image')
             top_image = top_image['content'] if top_image else 'snap.png'
-            if not text:  # Check if text is None or empty
-                raise ValueError("Parsed text is empty")
             return text, top_image
         except Exception as e:
-            st.warning(f"BeautifulSoup failed to extract article: {e}")
+            st.error(f"BeautifulSoup failed to extract article: {e}")
             return None, 'snap.png'
-
-
-def summarize_text(text):
-    stop_words = set(stopwords.words("english"))
-    words = word_tokenize(text)
-
-    freq_table = dict()
-    for word in words:
-        word = word.lower()
-        if word in stop_words:
-            continue
-        if word in freq_table:
-            freq_table[word] += 1
-        else:
-            freq_table[word] = 1
-
-    sentences = sent_tokenize(text)
-    sentence_value = dict()
-
-    for sentence in sentences:
-        for word, freq in freq_table.items():
-            if word in sentence.lower():
-                if sentence in sentence_value:
-                    sentence_value[sentence] += freq
-                else:
-                    sentence_value[sentence] = freq
-
-    sum_values = 0
-    for sentence in sentence_value:
-        sum_values += sentence_value[sentence]
-
-    average = int(sum_values / len(sentence_value))
-
-    summary = ''
-    for sentence in sentences:
-        if sentence in sentence_value and sentence_value[sentence] > (1.5 * average):
-            summary += " " + sentence
-    return summary
-
 
 def display_news(list_of_news, page_number, language, s):
     from googletrans import Translator
@@ -183,21 +129,18 @@ def display_news(list_of_news, page_number, language, s):
         index = start_index + i
         title = news.title.text if news.title else "No title"
         link = news.link.text if news.link else "No link"
-        source_tag = news.source if news.source else None
-        source = "Unknown source" if source_tag is None else source_tag.text.strip()
-
+        
         st.write(f'**({index + 1}) {title}**')
         if not link or not link.startswith('http'):
             st.warning(f"Skipping article with invalid URL: {link}")
             continue
-
         try:
             article_text, top_image = extract_article_text(link)
-            if not article_text:  # Skip articles with NoneType text
-                st.warning(f"Skipping article with no content: {link}")
-                continue
-            summary = summarize_text(article_text)
-            summary_translated = translator.translate(summary, dest=language).text
+            if article_text:
+                summary = summarize_text(article_text)
+                summary_translated = translator.translate(summary, dest=language).text
+            else:
+                summary_translated = "No content available for summarization."
         except Exception as e:
             st.error(f"Error processing article {link}: {e}")
             continue
@@ -206,7 +149,8 @@ def display_news(list_of_news, page_number, language, s):
 
         with st.expander(title):
             st.markdown(f"<h6 style='text-align: justify;'>{summary_translated}</h6>", unsafe_allow_html=True)
-            st.markdown(f"[Read more at {source}]({link})")
+            source_url = link
+            st.markdown(f"[Read more at source]({source_url})")
             audio_html = text_to_speech(summary_translated)
             st.markdown(audio_html, unsafe_allow_html=True)
 
@@ -224,7 +168,7 @@ def display_news(list_of_news, page_number, language, s):
                 <a href="https://www.facebook.com/sharer/sharer.php?u={link}" target="_blank">
                 <img src="https://img.icons8.com/fluent/48/000000/facebook-new.png"/>
                 </a>
-                                <a href="https://twitter.com/intent/tweet?url={link}&text={title}" target="_blank">
+                <a href="https://twitter.com/intent/tweet?url={link}&text={title}" target="_blank">
                 <img src="https://img.icons8.com/fluent/48/000000/twitter.png"/>
                 </a>
                 <a href="https://www.linkedin.com/shareArticle?mini=true&url={link}&title={title}" target="_blank">
@@ -235,7 +179,7 @@ def display_news(list_of_news, page_number, language, s):
             )
             st.success("Published Date: " + news.pubDate.text)
 
-
+            # Display and add comments
             st.write("Comments:")
             comments = load_comments(link)
             for comment in comments:
@@ -243,64 +187,8 @@ def display_news(list_of_news, page_number, language, s):
             new_comment = st.text_area(f"Add a comment for article {index + 1}", key=f"comment_{index}")
             if st.button("Submit", key=f"submit_{index}"):
                 add_comment(link, new_comment, s)
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    if page_number > 0:
-        with col1:
-            if st.button("Previous", key="prev"):
-                st.session_state['page_number'] -= 1
-                st.rerun()
-
-    if end_index < len(list_of_news):
-        with col3:
-            if st.button("Next", key="next"):
-                st.session_state['page_number'] += 1
-                st.rerun()
-
-def display_search_news(list_of_news, page_number):
-    items_per_page = 5
-    start_index = page_number * items_per_page
-    end_index = start_index + items_per_page
-    news_to_display = list_of_news[start_index:end_index]
-
-    for i, news in enumerate(news_to_display):
-        index = start_index + i
-        title = news.title.text if news.title else "No title"
-        link = news.link.text if news.link else "No link"
-        source_tag = news.find('source')
-        source = "Unknown source" if source_tag is None else source_tag.text.strip()
-
-        st.markdown(f"### {index + 1}. {title}")
-        st.markdown(f"*Source: {source}*")
-
-        try:
-            article_text, top_image = extract_article_text(link)
-            if article_text:
-                summary = summarize_text(article_text)
-                st.markdown(f"<p>{summary}</p>", unsafe_allow_html=True)
-            else:
-                st.markdown("<p>No content available for summarization.</p>", unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Error processing article {link}: {e}")
-            continue
-
-        st.markdown(f"[Read more at {source}]({link})")
-        st.write("---")
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    if page_number > 0:
-        with col1:
-            if st.button("Previous", key="prev_search"):
-                st.session_state['search_page_number'] -= 1
-                st.rerun()
-
-    if end_index < len(list_of_news):
-        with col3:
-            if st.button("Next", key="next_search"):
-                st.session_state['search_page_number'] += 1
-                st.rerun()
+                st.success("Comment added!")
+                st.experimental_rerun()
 
 def fetch_real_breaking_news():
     url = f'https://newsapi.org/v2/top-headlines?country=us&apiKey={NEWS_API_KEY}'
@@ -315,10 +203,10 @@ def simulate_notifications():
     notification = fetch_real_breaking_news()
     st.sidebar.info(notification)
 
-
 def remove_emojis(input_string):
     return re.sub(r'[^\w\s,]', '', input_string)
 
+import csv
 
 def add_comment(article_url, comment, username="Anonymous"):
     try:
@@ -336,9 +224,10 @@ def add_comment(article_url, comment, username="Anonymous"):
         else:
             comments = []
 
-
+        # Add new comment
         comments.append(new_comment)
 
+        # Write updated comments back to the CSV
         with open(COMMENTS_CSV, mode='w', newline='', encoding='utf-8') as file:
             fieldnames = ["article_url", "comment", "username"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -349,8 +238,6 @@ def add_comment(article_url, comment, username="Anonymous"):
 
     except Exception as e:
         st.error(f"Error saving comment: {e}")
-
-
 def load_comments(article_url):
     try:
         if os.path.exists(COMMENTS_CSV):
@@ -362,9 +249,10 @@ def load_comments(article_url):
     except Exception as e:
         st.error(f"Error loading comments: {e}")
         return []
+        st.error(f"Error saving comment: {e}")
 
-
-def main():
+def main(s):
+ 
     if 'saved_articles' not in st.session_state:
         st.session_state['saved_articles'] = []
 
@@ -373,10 +261,6 @@ def main():
 
     if 'page_number' not in st.session_state:
         st.session_state['page_number'] = 0
-
-    if 'search_page_number' not in st.session_state:
-        st.session_state['search_page_number'] = 0
-
     st.markdown("<h1 style='text-align: center;'>SnapNews🇸🇬: News Anytime, Anywhere 🌍🕒</h1>", unsafe_allow_html=True)
     image = Image.open('snap.png')
 
@@ -397,6 +281,10 @@ def main():
     category = ['--Select--', '🔥 Hot News', '💙 Top Picks', '🔍 Explore']
     cat_op = st.selectbox('Choose Your News', category)
 
+    language_options = ['English', 'Malay', 'Tamil', 'Chinese']
+    language = st.selectbox('Select Language', language_options)
+    language_code = {'English': 'en', 'Malay': 'ms', 'Tamil': 'ta', 'Chinese': 'zh-cn'}
+
     news_list = []
 
     if cat_op == category[0]:
@@ -404,7 +292,7 @@ def main():
     elif cat_op == category[1]:
         st.subheader("🔥 Hot News")
         news_list = fetch_rss_feed('https://www.yahoo.com/news/rss')
-        display_news(news_list, st.session_state['page_number'], 'en', 'username')
+        display_news(news_list, st.session_state['page_number'], language_code[language],s)
     elif cat_op == category[2]:
         av_topics = ['Choose Topic', '💼 Business', '💻 Tech', '⚖️ Politics', '🌍 World', '⚽ Sports']
         st.subheader("💙 Top Picks")
@@ -425,7 +313,7 @@ def main():
             
             if news_list:
                 st.subheader(f"💙 Here are some {chosen_topic.split()[-1]} news for you")
-                display_news(news_list, st.session_state['page_number'], 'en', 'username')
+                display_news(news_list, st.session_state['page_number'], language_code[language],s)
             else:
                 st.error(f"No news found for {chosen_topic}")
 
@@ -436,15 +324,25 @@ def main():
             user_topic_pr = remove_emojis(user_topic.replace(' ', ''))
             news_list = fetch_rss_feed(f"https://news.google.com/rss/search?q={user_topic_pr}&hl=en-IN&gl=IN&ceid=IN:en")
             if news_list:
-                st.subheader(f"🔍 Here is top 10 {user_topic.capitalize()} news for you")
-                display_search_news(news_list, st.session_state['search_page_number'])
+                st.subheader(f"🔍 Here are some {user_topic.capitalize()} news for you")
+                display_news(news_list, st.session_state['page_number'], language_code[language],s)
             else:
                 st.error(f"No news found for {user_topic}")
         else:
             st.warning("Please enter a topic name to search🔍")
 
+    if news_list:
+        if st.session_state['page_number'] > 0:
+            if st.button("Previous", key="prev"):
+                st.session_state['page_number'] -= 1
+                st.experimental_rerun()
+
+        if st.session_state['page_number'] < (len(news_list) // 5):
+            if st.button("Next", key="next"):
+                st.session_state['page_number'] += 1
+                st.experimental_rerun()
+
     load_saved_articles()
 
 if __name__ == "__main__":
     main()
-            
