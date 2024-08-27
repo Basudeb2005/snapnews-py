@@ -5,9 +5,12 @@ beautifulsoup4
 newspaper3k
 gtts
 requests
-pandas
+
 googletrans==4.0.0-rc1
-nltk
+
 lxml
 lxml_html_clean
-sumy
+
+nltk==3.8.1
+pandas==1.5.3
+sumy==0.8.1
