@@ -13,10 +13,10 @@ import os
 import pandas as pd
 import csv
 import nltk
-import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
 
+# Download necessary NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
@@ -27,6 +27,7 @@ try:
 except LookupError:
     nltk.download('stopwords', quiet=True)
 
+# Streamlit session state initialization
 if 'saved_articles' not in st.session_state:
     st.session_state['saved_articles'] = []
 
@@ -39,9 +40,11 @@ if 'page_number' not in st.session_state:
 if 'search_page_number' not in st.session_state:
     st.session_state['search_page_number'] = 0
 
+
 NEWS_API_KEY = 'ec48b2493593467a8947d0253d2786a2'
 COMMENTS_CSV = 'comments.csv'
 USERS_CSV = 'users.csv'
+
 
 def fetch_rss_feed(url):
     try:
@@ -66,15 +69,18 @@ def fetch_news_poster(poster_link):
         image = Image.open('snap.png')
         st.image(image, use_column_width=True)
 
+
 def save_article(index, title, link, summary):
     st.session_state['saved_articles'].append({'title': title, 'link': link, 'summary': summary})
     st.session_state['saved_status'][index] = True
     st.success(f'Article "{title}" saved!')
 
+
 def unsave_article(index, title):
     st.session_state['saved_articles'] = [article for article in st.session_state['saved_articles'] if article['title'] != title]
     st.session_state['saved_status'][index] = False
     st.success(f'Article "{title}" removed!')
+
 
 def load_saved_articles():
     st.subheader("Saved Articles")
@@ -126,6 +132,7 @@ def extract_article_text(url):
             st.warning(f"BeautifulSoup failed to extract article: {e}")
             return None, 'snap.png'
 
+
 def summarize_text(text):
     stop_words = set(stopwords.words("english"))
     words = word_tokenize(text)
@@ -162,6 +169,8 @@ def summarize_text(text):
         if sentence in sentence_value and sentence_value[sentence] > (1.5 * average):
             summary += " " + sentence
     return summary
+
+
 def display_news(list_of_news, page_number, language, s):
     from googletrans import Translator
     translator = Translator()
@@ -176,7 +185,7 @@ def display_news(list_of_news, page_number, language, s):
         link = news.link.text if news.link else "No link"
         source_tag = news.source if news.source else None
         source = "Unknown source" if source_tag is None else source_tag.text.strip()
-        
+
         st.write(f'**({index + 1}) {title}**')
         if not link or not link.startswith('http'):
             st.warning(f"Skipping article with invalid URL: {link}")
@@ -215,7 +224,7 @@ def display_news(list_of_news, page_number, language, s):
                 <a href="https://www.facebook.com/sharer/sharer.php?u={link}" target="_blank">
                 <img src="https://img.icons8.com/fluent/48/000000/facebook-new.png"/>
                 </a>
-                <a href="https://twitter.com/intent/tweet?url={link}&text={title}" target="_blank">
+                                <a href="https://twitter.com/intent/tweet?url={link}&text={title}" target="_blank">
                 <img src="https://img.icons8.com/fluent/48/000000/twitter.png"/>
                 </a>
                 <a href="https://www.linkedin.com/shareArticle?mini=true&url={link}&title={title}" target="_blank">
@@ -226,7 +235,7 @@ def display_news(list_of_news, page_number, language, s):
             )
             st.success("Published Date: " + news.pubDate.text)
 
-            # Display and add comments
+
             st.write("Comments:")
             comments = load_comments(link)
             for comment in comments:
@@ -248,6 +257,7 @@ def display_news(list_of_news, page_number, language, s):
             if st.button("Next", key="next"):
                 st.session_state['page_number'] += 1
                 st.rerun()
+
 def display_search_news(list_of_news, page_number):
     items_per_page = 5
     start_index = page_number * items_per_page
@@ -305,8 +315,10 @@ def simulate_notifications():
     notification = fetch_real_breaking_news()
     st.sidebar.info(notification)
 
+
 def remove_emojis(input_string):
     return re.sub(r'[^\w\s,]', '', input_string)
+
 
 def add_comment(article_url, comment, username="Anonymous"):
     try:
@@ -324,10 +336,9 @@ def add_comment(article_url, comment, username="Anonymous"):
         else:
             comments = []
 
-        # Add new comment
+
         comments.append(new_comment)
 
-        # Write updated comments back to the CSV
         with open(COMMENTS_CSV, mode='w', newline='', encoding='utf-8') as file:
             fieldnames = ["article_url", "comment", "username"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -338,6 +349,7 @@ def add_comment(article_url, comment, username="Anonymous"):
 
     except Exception as e:
         st.error(f"Error saving comment: {e}")
+
 
 def load_comments(article_url):
     try:
@@ -351,7 +363,8 @@ def load_comments(article_url):
         st.error(f"Error loading comments: {e}")
         return []
 
-def main(s):
+
+def main():
     if 'saved_articles' not in st.session_state:
         st.session_state['saved_articles'] = []
 
@@ -391,7 +404,7 @@ def main(s):
     elif cat_op == category[1]:
         st.subheader("🔥 Hot News")
         news_list = fetch_rss_feed('https://www.yahoo.com/news/rss')
-        display_news(news_list, st.session_state['page_number'], 'en', st.session_state['username'])
+        display_news(news_list, st.session_state['page_number'], 'en', 'username')
     elif cat_op == category[2]:
         av_topics = ['Choose Topic', '💼 Business', '💻 Tech', '⚖️ Politics', '🌍 World', '⚽ Sports']
         st.subheader("💙 Top Picks")
@@ -412,7 +425,7 @@ def main(s):
             
             if news_list:
                 st.subheader(f"💙 Here are some {chosen_topic.split()[-1]} news for you")
-                display_news(news_list, st.session_state['page_number'], 'en', st.session_state['username'])
+                display_news(news_list, st.session_state['page_number'], 'en', 'username')
             else:
                 st.error(f"No news found for {chosen_topic}")
 
@@ -434,3 +447,4 @@ def main(s):
 
 if __name__ == "__main__":
     main()
+            
