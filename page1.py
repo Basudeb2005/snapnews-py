@@ -21,7 +21,7 @@ import nltk
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt_tab') 
+    nltk.download('punkt') 
 
 
 if 'saved_articles' not in st.session_state:
