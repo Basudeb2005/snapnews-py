@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 import nltk
+nltk.download('punkt') 
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen, Request
 from newspaper import Article
@@ -18,7 +19,7 @@ from sumy.summarizers.lsa import LsaSummarizer
 import hashlib
 import csv
 
-nltk.download('all') 
+
 
 
 if 'saved_articles' not in st.session_state:
