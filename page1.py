@@ -18,7 +18,10 @@ import hashlib
 import csv
 import nltk
 
-nltk.download('punkt')
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 
 if 'saved_articles' not in st.session_state:
