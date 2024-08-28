@@ -11,13 +11,8 @@ import requests
 import re
 import os
 import pandas as pd
-from sumy.parsers.plaintext import PlaintextParser
-from sumy.nlp.tokenizers import Tokenizer
-from sumy.summarizers.lsa import LsaSummarizer
 import hashlib
 import csv
-
-
 
 if 'saved_articles' not in st.session_state:
     st.session_state['saved_articles'] = []
@@ -90,10 +85,12 @@ def text_to_speech(text, lang='en'):
     return audio_html
 
 def summarize_text(text):
-    parser = PlaintextParser.from_string(text, Tokenizer("english"))
-    summarizer = LsaSummarizer()
-    summary = summarizer(parser.document, 2)  # Summarize to 2 sentences
-    return " ".join([str(sentence) for sentence in summary])
+    words = text.split()
+    if len(words) > 120:
+        summary = " ".join(words[:60] + ["..."] + words[-60:])
+    else:
+        summary = text
+    return summary
 
 def extract_article_text(url):
     try:
@@ -179,7 +176,6 @@ def display_news(list_of_news, page_number, language, s):
             )
             st.success("Published Date: " + news.pubDate.text)
 
-            # Display and add comments
             st.write("Comments:")
             comments = load_comments(link)
             for comment in comments:
@@ -206,8 +202,6 @@ def simulate_notifications():
 def remove_emojis(input_string):
     return re.sub(r'[^\w\s,]', '', input_string)
 
-import csv
-
 def add_comment(article_url, comment, username="Anonymous"):
     try:
         if comment.strip() == "":
@@ -216,7 +210,6 @@ def add_comment(article_url, comment, username="Anonymous"):
 
         new_comment = {"article_url": article_url, "comment": comment, "username": username}
 
-        # Read existing comments
         if os.path.exists(COMMENTS_CSV):
             with open(COMMENTS_CSV, mode='r', newline='', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
@@ -224,20 +217,18 @@ def add_comment(article_url, comment, username="Anonymous"):
         else:
             comments = []
 
-        # Add new comment
         comments.append(new_comment)
 
-        # Write updated comments back to the CSV
         with open(COMMENTS_CSV, mode='w', newline='', encoding='utf-8') as file:
             fieldnames = ["article_url", "comment", "username"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(comments)
-
-        st.success("Comment added successfully!")
+            st.success("Comment added successfully!")
 
     except Exception as e:
         st.error(f"Error saving comment: {e}")
+
 def load_comments(article_url):
     try:
         if os.path.exists(COMMENTS_CSV):
@@ -249,10 +240,8 @@ def load_comments(article_url):
     except Exception as e:
         st.error(f"Error loading comments: {e}")
         return []
-        st.error(f"Error saving comment: {e}")
 
 def main(s):
- 
     if 'saved_articles' not in st.session_state:
         st.session_state['saved_articles'] = []
 
@@ -261,6 +250,7 @@ def main(s):
 
     if 'page_number' not in st.session_state:
         st.session_state['page_number'] = 0
+
     st.markdown("<h1 style='text-align: center;'>SnapNews🇸🇬: News Anytime, Anywhere 🌍🕒</h1>", unsafe_allow_html=True)
     image = Image.open('snap.png')
 
@@ -292,7 +282,7 @@ def main(s):
     elif cat_op == category[1]:
         st.subheader("🔥 Hot News")
         news_list = fetch_rss_feed('https://www.yahoo.com/news/rss')
-        display_news(news_list, st.session_state['page_number'], language_code[language],s)
+        display_news(news_list, st.session_state['page_number'], language_code[language], s)
     elif cat_op == category[2]:
         av_topics = ['Choose Topic', '💼 Business', '💻 Tech', '⚖️ Politics', '🌍 World', '⚽ Sports']
         st.subheader("💙 Top Picks")
@@ -310,10 +300,10 @@ def main(s):
                 news_list = fetch_rss_feed('https://news.yahoo.com/rss/world')
             elif chosen_topic == '⚽ Sports':
                 news_list = fetch_rss_feed('https://sports.yahoo.com/rss/')
-            
+
             if news_list:
                 st.subheader(f"💙 Here are some {chosen_topic.split()[-1]} news for you")
-                display_news(news_list, st.session_state['page_number'], language_code[language],s)
+                display_news(news_list, st.session_state['page_number'], language_code[language], s)
             else:
                 st.error(f"No news found for {chosen_topic}")
 
@@ -325,7 +315,7 @@ def main(s):
             news_list = fetch_rss_feed(f"https://news.google.com/rss/search?q={user_topic_pr}&hl=en-IN&gl=IN&ceid=IN:en")
             if news_list:
                 st.subheader(f"🔍 Here are some {user_topic.capitalize()} news for you")
-                display_news(news_list, st.session_state['page_number'], language_code[language],s)
+                display_news(news_list, st.session_state['page_number'], language_code[language], s)
             else:
                 st.error(f"No news found for {user_topic}")
         else:
@@ -346,3 +336,4 @@ def main(s):
 
 if __name__ == "__main__":
     main()
+       
