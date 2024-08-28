@@ -16,7 +16,9 @@ from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer
 import hashlib
 import csv
+import nltk
 
+nltk.download('punkt')
 
 
 if 'saved_articles' not in st.session_state:
