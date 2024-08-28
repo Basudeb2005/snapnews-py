@@ -12,4 +12,5 @@ lxml
 lxml_html_clean
 
 pandas
-
+nltk 
+sumy 
