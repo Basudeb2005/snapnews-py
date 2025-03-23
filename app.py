@@ -1,4 +1,3 @@
-
 import sys
 import os
 import subprocess
@@ -56,3 +55,36 @@ def login():
         username = st.text_input('Enter your unique username')
 
         if st.button('Create my account'):
+            try:
+                user = auth.create_user(
+                    email=email,
+                    password=password,
+                    display_name=username
+                )
+                st.success('Account created successfully!')
+                st.markdown('Please login using your email and password')
+                st.balloons()
+            except Exception as e:
+                st.error(f'Error: {str(e)}')
+
+def pa():
+    import page1
+    page1.main(st.session_state['username'])
+    if st.button("Log out"):
+        st.session_state['logged_in'] = False
+        st.session_state['current_page'] = 'login'
+
+def main():
+    if 'logged_in' not in st.session_state:
+        st.session_state['logged_in'] = False
+
+    if 'current_page' not in st.session_state:
+        st.session_state['current_page'] = 'login'
+
+    if st.session_state['current_page'] == 'login':
+        login()
+    elif st.session_state['current_page'] == 'page1' and st.session_state['logged_in']:
+        pa()
+
+if __name__ == "__main__":
+    main()
