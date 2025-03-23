@@ -1,10 +1,24 @@
+
+import sys
+import os
+import subprocess
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, auth
 import nltk
-import os
-nltk.download('punkt')
 
+# First download NLTK data to ensure it's available
+try:
+    print("Running NLTK download script...")
+    subprocess.run(["python", "download_nltk_data.py"], check=True)
+    print("NLTK download complete")
+except Exception as e:
+    print(f"Error downloading NLTK data: {e}")
+
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 st.set_page_config(page_title='SnapNews🇸🇬: News Anytime, Anywhere', page_icon='snap.png')
 
@@ -52,6 +66,13 @@ def login():
             except Exception as e:
                 st.error(f'Error: {str(e)}')
 
+def pa():
+    import page1
+    page1.main(st.session_state['username'])
+    if st.button("Log out"):
+        st.session_state['logged_in'] = False
+        st.session_state['current_page'] = 'login'
+
 def main():
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
@@ -63,13 +84,6 @@ def main():
         login()
     elif st.session_state['current_page'] == 'page1' and st.session_state['logged_in']:
         pa()
-
-def pa():
-    import page1
-    page1.main(st.session_state['username'])
-    if st.button("Log out"):
-        st.session_state['logged_in'] = False
-        st.session_state['current_page'] = 'login'
 
 if __name__ == "__main__":
     main()
