@@ -6,19 +6,21 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, auth
 import nltk
-
-# First download NLTK data to ensure it's available
-try:
-    print("Running NLTK download script...")
-    subprocess.run(["python", "download_nltk_data.py"], check=True)
-    print("NLTK download complete")
-except Exception as e:
-    print(f"Error downloading NLTK data: {e}")
+import ssl
 
 try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+# Download required NLTK data
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('averaged_perceptron_tagger', quiet=True)
+nltk.download('maxent_ne_chunker', quiet=True)
+nltk.download('words', quiet=True)
 
 st.set_page_config(page_title='SnapNews🇸🇬: News Anytime, Anywhere', page_icon='snap.png')
 
@@ -54,36 +56,3 @@ def login():
         username = st.text_input('Enter your unique username')
 
         if st.button('Create my account'):
-            try:
-                user = auth.create_user(
-                    email=email,
-                    password=password,
-                    display_name=username
-                )
-                st.success('Account created successfully!')
-                st.markdown('Please login using your email and password')
-                st.balloons()
-            except Exception as e:
-                st.error(f'Error: {str(e)}')
-
-def pa():
-    import page1
-    page1.main(st.session_state['username'])
-    if st.button("Log out"):
-        st.session_state['logged_in'] = False
-        st.session_state['current_page'] = 'login'
-
-def main():
-    if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = False
-
-    if 'current_page' not in st.session_state:
-        st.session_state['current_page'] = 'login'
-
-    if st.session_state['current_page'] == 'login':
-        login()
-    elif st.session_state['current_page'] == 'page1' and st.session_state['logged_in']:
-        pa()
-
-if __name__ == "__main__":
-    main()
