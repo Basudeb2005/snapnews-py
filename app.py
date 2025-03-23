@@ -2,6 +2,7 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, auth
 import nltk
+import os
 nltk.download('punkt')
 
 
@@ -9,7 +10,7 @@ st.set_page_config(page_title='SnapNews🇸🇬: News Anytime, Anywhere', page_i
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
-    cred = credentials.Certificate('orbitals-d866e-b32d6b61b17c.json')
+    cred = credentials.Certificate(os.path.join(os.path.dirname(__file__), 'orbitals-d866e-b32d6b61b17c.json'))
     firebase_admin.initialize_app(cred)
 
 def login():
